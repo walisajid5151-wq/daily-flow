@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    /* Core colors - Calming teal/cyan palette */
+    /* Default theme - Teal (light mode) */
     --background: 210 20% 98%;
     --foreground: 222 47% 11%;
 
@@ -76,6 +76,7 @@
     --sidebar-ring: 173 58% 39%;
   }
 
+  /* Dark mode - default */
   .dark {
     --background: 222 47% 7%;
     --foreground: 210 40% 98%;
@@ -130,6 +131,120 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
     --sidebar-ring: 173 58% 50%;
+  }
+
+  /* Ocean Theme */
+  .dark.theme-ocean {
+    --primary: 200 80% 50%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 200 80% 60%;
+    --ring: 200 80% 50%;
+    --gradient-primary: linear-gradient(135deg, hsl(200 80% 45%), hsl(200 80% 55%));
+    --shadow-glow: 0 0 20px hsl(200 80% 50% / 0.4);
+  }
+
+  .theme-ocean {
+    --primary: 200 80% 40%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 200 80% 50%;
+    --ring: 200 80% 40%;
+    --gradient-primary: linear-gradient(135deg, hsl(200 80% 40%), hsl(200 80% 50%));
+    --shadow-glow: 0 0 20px hsl(200 80% 40% / 0.3);
+  }
+
+  /* Sunset Theme */
+  .dark.theme-sunset {
+    --primary: 15 90% 55%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 15 90% 65%;
+    --ring: 15 90% 55%;
+    --gradient-primary: linear-gradient(135deg, hsl(15 90% 50%), hsl(35 90% 55%));
+    --shadow-glow: 0 0 20px hsl(15 90% 55% / 0.4);
+  }
+
+  .theme-sunset {
+    --primary: 15 90% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 15 90% 55%;
+    --ring: 15 90% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(15 90% 45%), hsl(35 90% 50%));
+    --shadow-glow: 0 0 20px hsl(15 90% 45% / 0.3);
+  }
+
+  /* Lavender Theme */
+  .dark.theme-lavender {
+    --primary: 270 70% 60%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 270 70% 70%;
+    --ring: 270 70% 60%;
+    --gradient-primary: linear-gradient(135deg, hsl(270 70% 55%), hsl(290 70% 60%));
+    --shadow-glow: 0 0 20px hsl(270 70% 60% / 0.4);
+  }
+
+  .theme-lavender {
+    --primary: 270 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 270 70% 60%;
+    --ring: 270 70% 50%;
+    --gradient-primary: linear-gradient(135deg, hsl(270 70% 50%), hsl(290 70% 55%));
+    --shadow-glow: 0 0 20px hsl(270 70% 50% / 0.3);
+  }
+
+  /* Emerald Theme */
+  .dark.theme-emerald {
+    --primary: 160 84% 45%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 160 84% 55%;
+    --ring: 160 84% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(160 84% 40%), hsl(160 84% 50%));
+    --shadow-glow: 0 0 20px hsl(160 84% 45% / 0.4);
+  }
+
+  .theme-emerald {
+    --primary: 160 84% 35%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 160 84% 45%;
+    --ring: 160 84% 35%;
+    --gradient-primary: linear-gradient(135deg, hsl(160 84% 35%), hsl(160 84% 45%));
+    --shadow-glow: 0 0 20px hsl(160 84% 35% / 0.3);
+  }
+
+  /* Slate Theme (Professional) */
+  .dark.theme-slate {
+    --primary: 215 25% 55%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 215 25% 65%;
+    --ring: 215 25% 55%;
+    --gradient-primary: linear-gradient(135deg, hsl(215 25% 50%), hsl(215 25% 60%));
+    --shadow-glow: 0 0 20px hsl(215 25% 55% / 0.4);
+  }
+
+  .theme-slate {
+    --primary: 215 25% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 215 25% 55%;
+    --ring: 215 25% 45%;
+    --gradient-primary: linear-gradient(135deg, hsl(215 25% 45%), hsl(215 25% 55%));
+    --shadow-glow: 0 0 20px hsl(215 25% 45% / 0.3);
+  }
+
+  /* Rose Theme */
+  .dark.theme-rose {
+    --primary: 350 80% 60%;
+    --primary-foreground: 222 47% 7%;
+    --primary-glow: 350 80% 70%;
+    --ring: 350 80% 60%;
+    --gradient-primary: linear-gradient(135deg, hsl(350 80% 55%), hsl(330 80% 60%));
+    --shadow-glow: 0 0 20px hsl(350 80% 60% / 0.4);
+  }
+
+  .theme-rose {
+    --primary: 350 80% 50%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 350 80% 60%;
+    --ring: 350 80% 50%;
+    --gradient-primary: linear-gradient(135deg, hsl(350 80% 50%), hsl(330 80% 55%));
+    --shadow-glow: 0 0 20px hsl(350 80% 50% / 0.3);
   }
 }
 
@@ -311,6 +426,25 @@
   .pulse-ring {
     @apply absolute inset-0 rounded-full animate-ping opacity-25;
   }
+
+  /* Quote highlight card */
+  .quote-card {
+    @apply relative overflow-hidden rounded-2xl bg-gradient-primary p-6 text-primary-foreground;
+  }
+
+  .quote-card::before {
+    content: '"';
+    @apply absolute -top-4 -left-2 text-8xl opacity-20 font-serif;
+  }
+
+  /* Theme button */
+  .theme-btn {
+    @apply w-10 h-10 rounded-full border-2 border-border transition-all duration-200 cursor-pointer hover:scale-110;
+  }
+
+  .theme-btn.active {
+    @apply ring-2 ring-offset-2 ring-primary scale-110;
+  }
 }
 
 /* Keyframe animations */
@@ -382,6 +516,27 @@
   }
 }
 
+@keyframes celebration {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(5deg);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.6);
+  }
+}
+
 .animate-slide-down {
   animation: slide-down 0.3s ease-out;
 }
@@ -411,6 +566,14 @@
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+.animate-celebration {
+  animation: celebration 0.5s ease-in-out;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
 }
 
 /* PWA styles */
