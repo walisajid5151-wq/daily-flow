@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, Pause, RotateCcw, Check, Coffee, Brain } from "lucide-react";
+import { usePomodoroTimer } from "@/hooks/usePomodoroTimer";
+import { useNotification } from "@/hooks/useNotification";
 import confetti from "canvas-confetti";
 
 const WORK_DURATIONS = [15, 25, 30, 45, 60];
 const BREAK_DURATION = 5;
-
-type SessionType = "work" | "break";
 
 const QUOTES = [
   "Small progress is still progress.",
@@ -26,14 +26,11 @@ const QUOTES = [
 export default function Focus() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { notify, playSound } = useNotification();
   const [workDuration, setWorkDuration] = useState(25);
-  const [sessionType, setSessionType] = useState<SessionType>("work");
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [sessionsCompleted, setSessionsCompleted] = useState(0);
   const [currentQuote, setCurrentQuote] = useState("");
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const timer = usePomodoroTimer(workDuration, BREAK_DURATION);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -41,33 +38,36 @@ export default function Focus() {
 
   useEffect(() => {
     setCurrentQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-  }, [isComplete]);
+  }, [timer.isComplete]);
 
+  // Handle session completion
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      setIsComplete(true);
+    if (timer.isComplete && timer.timeLeft === 0) {
       handleSessionComplete();
     }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isRunning, timeLeft]);
+  }, [timer.isComplete, timer.timeLeft]);
 
   const handleSessionComplete = async () => {
-    // Fire confetti
-    confetti({
-      particleCount: 150,
-      spread: 100,
-      origin: { y: 0.6 },
-      colors: ['#1d9b8a', '#f59e0b', '#22c55e', '#8b5cf6']
+    // Play alarm sound and show notification
+    playSound("alarm");
+    notify(timer.sessionType === "work" ? "Focus Complete! 🎉" : "Break Over!", {
+      body: timer.sessionType === "work" 
+        ? "Great work! Take a well-deserved break." 
+        : "Ready to get back to work?",
+      sound: "success"
     });
 
-    if (sessionType === "work") {
-      setSessionsCompleted(prev => prev + 1);
+    // Fire confetti for work sessions
+    if (timer.sessionType === "work") {
+      confetti({
+        particleCount: 30,
+        spread: 60,
+        origin: { y: 0.6 },
+        colors: ['#1d9b8a', '#f59e0b', '#22c55e']
+      });
       
+      timer.completeSession();
+
       if (user) {
         await supabase.from("focus_sessions").insert({
           user_id: user.id,
@@ -82,37 +82,23 @@ export default function Focus() {
 
   const selectWorkDuration = (mins: number) => {
     setWorkDuration(mins);
-    if (sessionType === "work") {
-      setTimeLeft(mins * 60);
-    }
-    setIsComplete(false);
-  };
-
-  const startSession = (type: SessionType) => {
-    setSessionType(type);
-    setTimeLeft(type === "work" ? workDuration * 60 : BREAK_DURATION * 60);
-    setIsComplete(false);
-    setIsRunning(true);
-  };
-
-  const reset = () => {
-    setTimeLeft(sessionType === "work" ? workDuration * 60 : BREAK_DURATION * 60);
-    setIsRunning(false);
-    setIsComplete(false);
+    timer.setWorkDurationMin(mins);
   };
 
   const startNextSession = () => {
-    if (sessionType === "work") {
-      startSession("break");
+    if (timer.sessionType === "work") {
+      timer.startSession("break");
     } else {
-      startSession("work");
+      timer.startSession("work");
     }
   };
 
-  const currentDuration = sessionType === "work" ? workDuration : BREAK_DURATION;
-  const progress = ((currentDuration * 60 - timeLeft) / (currentDuration * 60)) * 100;
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+  const progress = timer.sessionType === "work"
+    ? ((workDuration * 60 - timer.timeLeft) / (workDuration * 60)) * 100
+    : ((BREAK_DURATION * 60 - timer.timeLeft) / (BREAK_DURATION * 60)) * 100;
+  
+  const minutes = Math.floor(timer.timeLeft / 60);
+  const seconds = timer.timeLeft % 60;
 
   if (loading) return null;
 
@@ -127,13 +113,13 @@ export default function Focus() {
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Brain className="w-4 h-4" />
-          <span>{sessionsCompleted} sessions</span>
+          <span>{timer.sessionsCompleted} sessions</span>
         </div>
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 pb-20">
         <AnimatePresence mode="wait">
-          {isComplete ? (
+          {timer.isComplete ? (
             <motion.div
               key="complete"
               initial={{ scale: 0.8, opacity: 0 }}
@@ -143,12 +129,12 @@ export default function Focus() {
             >
               <motion.div 
                 className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                  sessionType === "work" ? "bg-gradient-success" : "bg-gradient-accent"
+                  timer.sessionType === "work" ? "bg-gradient-success" : "bg-gradient-accent"
                 }`}
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 0.5 }}
               >
-                {sessionType === "work" ? (
+                {timer.sessionType === "work" ? (
                   <Check className="w-16 h-16 text-success-foreground" />
                 ) : (
                   <Coffee className="w-16 h-16 text-accent-foreground" />
@@ -156,7 +142,7 @@ export default function Focus() {
               </motion.div>
               
               <h2 className="text-2xl font-display font-bold mb-2">
-                {sessionType === "work" ? "Great work!" : "Break's over!"}
+                {timer.sessionType === "work" ? "Great work!" : "Break's over!"}
               </h2>
               
               {/* Highlighted Quote Card */}
@@ -174,7 +160,7 @@ export default function Focus() {
                   onClick={startNextSession} 
                   className="w-full bg-gradient-primary glow-primary"
                 >
-                  {sessionType === "work" ? (
+                  {timer.sessionType === "work" ? (
                     <>
                       <Coffee className="w-4 h-4 mr-2" />
                       Start 5 min Break
@@ -186,7 +172,7 @@ export default function Focus() {
                     </>
                   )}
                 </Button>
-                <Button variant="outline" onClick={() => { setIsComplete(false); reset(); }}>
+                <Button variant="outline" onClick={timer.reset}>
                   Back to Timer
                 </Button>
               </div>
@@ -201,25 +187,25 @@ export default function Focus() {
               {/* Session Type Tabs */}
               <div className="flex justify-center gap-2 mb-6">
                 <button
-                  onClick={() => !isRunning && startSession("work")}
-                  disabled={isRunning}
+                  onClick={() => !timer.isRunning && timer.startSession("work")}
+                  disabled={timer.isRunning}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                    sessionType === "work"
+                    timer.sessionType === "work"
                       ? "bg-primary text-primary-foreground"
                       : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  } ${isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${timer.isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <Brain className="w-4 h-4" />
                   Focus
                 </button>
                 <button
-                  onClick={() => !isRunning && startSession("break")}
-                  disabled={isRunning}
+                  onClick={() => !timer.isRunning && timer.startSession("break")}
+                  disabled={timer.isRunning}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                    sessionType === "break"
+                    timer.sessionType === "break"
                       ? "bg-accent text-accent-foreground"
                       : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                  } ${isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
+                  } ${timer.isRunning ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <Coffee className="w-4 h-4" />
                   Break
@@ -227,7 +213,7 @@ export default function Focus() {
               </div>
 
               {/* Duration Selector (only for work sessions when not running) */}
-              {!isRunning && sessionType === "work" && (
+              {!timer.isRunning && timer.sessionType === "work" && (
                 <div className="flex justify-center gap-2 mb-8">
                   {WORK_DURATIONS.map(d => (
                     <button
@@ -252,7 +238,7 @@ export default function Focus() {
                   <circle
                     cx="128" cy="128" r="120"
                     fill="none"
-                    stroke={sessionType === "work" ? "hsl(var(--primary))" : "hsl(var(--accent))"}
+                    stroke={timer.sessionType === "work" ? "hsl(var(--primary))" : "hsl(var(--accent))"}
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeDasharray={754}
@@ -265,10 +251,10 @@ export default function Focus() {
                     {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
                   </span>
                   <span className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
-                    {sessionType === "work" ? (
-                      <><Brain className="w-3 h-3" /> {isRunning ? "Stay focused" : "Ready to focus?"}</>
+                    {timer.sessionType === "work" ? (
+                      <><Brain className="w-3 h-3" /> {timer.isRunning ? "Stay focused" : "Ready to focus?"}</>
                     ) : (
-                      <><Coffee className="w-3 h-3" /> {isRunning ? "Relax..." : "Ready for break?"}</>
+                      <><Coffee className="w-3 h-3" /> {timer.isRunning ? "Relax..." : "Ready for break?"}</>
                     )}
                   </span>
                 </div>
@@ -276,19 +262,19 @@ export default function Focus() {
 
               {/* Controls */}
               <div className="flex justify-center gap-4">
-                <Button variant="outline" size="icon" onClick={reset} className="w-12 h-12 rounded-full">
+                <Button variant="outline" size="icon" onClick={timer.reset} className="w-12 h-12 rounded-full">
                   <RotateCcw className="w-5 h-5" />
                 </Button>
                 <Button
                   size="icon"
-                  onClick={() => setIsRunning(!isRunning)}
+                  onClick={() => timer.isRunning ? timer.pause() : timer.start()}
                   className={`w-16 h-16 rounded-full ${
-                    sessionType === "work" 
+                    timer.sessionType === "work" 
                       ? "bg-gradient-primary glow-primary" 
                       : "bg-gradient-accent glow-accent"
                   }`}
                 >
-                  {isRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
+                  {timer.isRunning ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
                 </Button>
               </div>
             </motion.div>

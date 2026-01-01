@@ -10,7 +10,9 @@ import { TaskCard } from "@/components/TaskCard";
 import { QuickActions } from "@/components/QuickActions";
 import { ProgressRing } from "@/components/ProgressRing";
 import { CelebrationOverlay } from "@/components/CelebrationOverlay";
-import { Plus, Calendar, Target, Flame, Quote } from "lucide-react";
+import { StreakCard } from "@/components/StreakCard";
+import { useExamReminders } from "@/hooks/useExamReminders";
+import { Plus, Calendar, Target, Quote } from "lucide-react";
 import { format } from "date-fns";
 
 interface Task {
@@ -20,6 +22,14 @@ interface Task {
   duration_minutes: number;
   completed: boolean;
   priority: string;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  target_minutes_daily: number;
+  streak_count: number;
+  last_practiced_at: string | null;
 }
 
 const MOTIVATIONAL_MESSAGES = [
@@ -38,10 +48,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [motivationalMessage, setMotivationalMessage] = useState("");
-  const [streak, setStreak] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationQuote, setCelebrationQuote] = useState("");
+
+  // Enable exam reminders
+  useExamReminders(user?.id);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -50,8 +63,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       fetchTasks();
+      fetchSkills();
       generateMotivation();
-      fetchStreak();
     }
   }, [user]);
 
@@ -65,32 +78,21 @@ export default function Dashboard() {
     if (data) setTasks(data);
   };
 
-  const fetchStreak = async () => {
-    if (!user) return;
-    const { data: reviews } = await supabase
-      .from("daily_reviews")
-      .select("review_date, all_completed")
-      .eq("user_id", user.id)
-      .order("review_date", { ascending: false })
-      .limit(30);
+  const fetchSkills = async () => {
+    const { data } = await supabase.from("skills").select("*").order("created_at");
+    if (data) setSkills(data);
+  };
 
-    if (reviews && reviews.length > 0) {
-      let currentStreak = 0;
-      const dates = reviews.filter(r => r.all_completed).map(r => r.review_date);
-      
-      for (let i = 0; i < 30; i++) {
-        const checkDate = new Date();
-        checkDate.setDate(checkDate.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-        
-        if (dates.includes(dateStr)) {
-          currentStreak++;
-        } else if (i > 0) {
-          break;
-        }
-      }
-      setStreak(currentStreak);
-    }
+  // Calculate total streak based on skill practice
+  const calculateTotalStreak = () => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const allPracticedToday = skills.length > 0 && skills.every(s => s.last_practiced_at === today);
+    
+    // Get minimum streak among all skills (you're only as strong as your weakest link)
+    if (skills.length === 0) return 0;
+    
+    const minStreak = Math.min(...skills.map(s => s.streak_count || 0));
+    return allPracticedToday ? Math.max(minStreak, 1) : minStreak;
   };
 
   const generateMotivation = () => {
@@ -107,7 +109,6 @@ export default function Dashboard() {
     fetchTasks();
     
     if (!completed) {
-      // Show celebration with task-specific quote
       setCelebrationQuote(`"${task?.title}" - Done! Keep crushing it.`);
       setShowCelebration(true);
       toast({ title: "Task completed! 🎉" });
@@ -116,6 +117,13 @@ export default function Dashboard() {
 
   const completedCount = tasks.filter(t => t.completed).length;
   const progress = tasks.length ? (completedCount / tasks.length) * 100 : 0;
+
+  const skillStreakData = skills.map(s => ({
+    skillName: s.name,
+    streak: s.streak_count || 0,
+    lastPracticed: s.last_practiced_at,
+    targetMinutes: s.target_minutes_daily
+  }));
 
   if (loading) return <div className="min-h-screen bg-gradient-hero flex items-center justify-center"><div className="animate-pulse">Loading...</div></div>;
 
@@ -135,20 +143,17 @@ export default function Dashboard() {
               Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}
             </h1>
           </div>
-          {streak > 0 && (
-            <motion.div 
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="streak-badge"
-            >
-              <Flame className="w-4 h-4" />
-              {streak} day{streak !== 1 ? 's' : ''}
-            </motion.div>
-          )}
         </motion.div>
       </header>
 
       <main className="px-4 space-y-6">
+        {/* Interactive Streak Card */}
+        <StreakCard 
+          skills={skillStreakData}
+          totalStreak={calculateTotalStreak()}
+          onViewSkills={() => navigate("/skills")}
+        />
+
         {/* Progress Card */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
           <div className="flex items-center gap-4">
