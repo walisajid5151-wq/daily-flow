@@ -27,38 +27,27 @@ export function CelebrationOverlay({ show, quote, onComplete }: CelebrationOverl
     if (show) {
       setIsVisible(true);
       
-      // Fire multiple confetti bursts
-      const duration = 2000;
-      const animationEnd = Date.now() + duration;
-      
-      const fireConfetti = () => {
-        confetti({
-          particleCount: 50,
-          angle: 60,
-          spread: 55,
-          origin: { x: 0, y: 0.7 },
-          colors: ['#1d9b8a', '#f59e0b', '#22c55e', '#8b5cf6', '#ec4899']
-        });
-        confetti({
-          particleCount: 50,
-          angle: 120,
-          spread: 55,
-          origin: { x: 1, y: 0.7 },
-          colors: ['#1d9b8a', '#f59e0b', '#22c55e', '#8b5cf6', '#ec4899']
-        });
+      // Quick burst confetti - reduced particles
+      confetti({
+        particleCount: 25,
+        angle: 60,
+        spread: 40,
+        origin: { x: 0.1, y: 0.6 },
+        colors: ['#1d9b8a', '#f59e0b', '#22c55e']
+      });
+      confetti({
+        particleCount: 25,
+        angle: 120,
+        spread: 40,
+        origin: { x: 0.9, y: 0.6 },
+        colors: ['#1d9b8a', '#f59e0b', '#22c55e']
+      });
 
-        if (Date.now() < animationEnd) {
-          requestAnimationFrame(fireConfetti);
-        }
-      };
-      
-      fireConfetti();
-
-      // Auto-hide after 3 seconds
+      // Auto-hide after 1.5 seconds (shorter)
       const timer = setTimeout(() => {
         setIsVisible(false);
         onComplete?.();
-      }, 3000);
+      }, 1500);
 
       return () => clearTimeout(timer);
     }
@@ -71,43 +60,38 @@ export function CelebrationOverlay({ show, quote, onComplete }: CelebrationOverl
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-background/50 backdrop-blur-sm"
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-background/40 backdrop-blur-sm"
           onClick={() => {
             setIsVisible(false);
             onComplete?.();
           }}
         >
           <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", damping: 15, stiffness: 300 }}
-            className="text-center p-8"
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 400, duration: 0.3 }}
+            className="text-center p-6"
           >
-            {/* Party Popper Emoji Animation */}
+            {/* Quick Party Popper */}
             <motion.div
-              className="text-8xl mb-6"
-              animate={{ 
-                scale: [1, 1.2, 1],
-                rotate: [0, -10, 10, 0]
-              }}
-              transition={{ 
-                duration: 0.5,
-                repeat: 2,
-                repeatType: "reverse"
-              }}
+              className="text-6xl mb-4"
+              initial={{ rotate: -20, scale: 0 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ type: "spring", damping: 12, stiffness: 200 }}
             >
               🎉
             </motion.div>
 
             {/* Quote Card */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="quote-card max-w-sm mx-auto animate-glow-pulse"
+              transition={{ delay: 0.15 }}
+              className="quote-card max-w-xs mx-auto"
             >
-              <p className="text-lg font-medium relative z-10">{displayQuote}</p>
+              <p className="text-base font-medium">{displayQuote}</p>
             </motion.div>
           </motion.div>
         </motion.div>
