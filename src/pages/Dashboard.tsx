@@ -9,7 +9,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { TaskCard } from "@/components/TaskCard";
 import { QuickActions } from "@/components/QuickActions";
 import { ProgressRing } from "@/components/ProgressRing";
-import { Plus, Calendar, Target, Sparkles } from "lucide-react";
+import { CelebrationOverlay } from "@/components/CelebrationOverlay";
+import { Plus, Calendar, Target, Flame, Quote } from "lucide-react";
 import { format } from "date-fns";
 
 interface Task {
@@ -21,12 +22,26 @@ interface Task {
   priority: string;
 }
 
+const MOTIVATIONAL_MESSAGES = [
+  "Small steps lead to big wins. You've got this.",
+  "Focus on progress, not perfection.",
+  "Every task you complete is a win.",
+  "Your future self will thank you.",
+  "One thing at a time. Start now.",
+  "You're closer than you think.",
+  "Consistency beats intensity.",
+  "Today's effort shapes tomorrow's success.",
+];
+
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [motivationalMessage, setMotivationalMessage] = useState("");
+  const [streak, setStreak] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationQuote, setCelebrationQuote] = useState("");
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -36,6 +51,7 @@ export default function Dashboard() {
     if (user) {
       fetchTasks();
       generateMotivation();
+      fetchStreak();
     }
   }, [user]);
 
@@ -49,21 +65,53 @@ export default function Dashboard() {
     if (data) setTasks(data);
   };
 
+  const fetchStreak = async () => {
+    if (!user) return;
+    const { data: reviews } = await supabase
+      .from("daily_reviews")
+      .select("review_date, all_completed")
+      .eq("user_id", user.id)
+      .order("review_date", { ascending: false })
+      .limit(30);
+
+    if (reviews && reviews.length > 0) {
+      let currentStreak = 0;
+      const dates = reviews.filter(r => r.all_completed).map(r => r.review_date);
+      
+      for (let i = 0; i < 30; i++) {
+        const checkDate = new Date();
+        checkDate.setDate(checkDate.getDate() - i);
+        const dateStr = checkDate.toISOString().split('T')[0];
+        
+        if (dates.includes(dateStr)) {
+          currentStreak++;
+        } else if (i > 0) {
+          break;
+        }
+      }
+      setStreak(currentStreak);
+    }
+  };
+
   const generateMotivation = () => {
-    const messages = [
-      "Small steps lead to big wins. You've got this.",
-      "Focus on progress, not perfection.",
-      "Every task you complete is a win.",
-      "Your future self will thank you.",
-      "One thing at a time. Start now."
-    ];
-    setMotivationalMessage(messages[Math.floor(Math.random() * messages.length)]);
+    setMotivationalMessage(MOTIVATIONAL_MESSAGES[Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length)]);
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
-    await supabase.from("tasks").update({ completed: !completed, completed_at: !completed ? new Date().toISOString() : null }).eq("id", id);
+    const task = tasks.find(t => t.id === id);
+    await supabase.from("tasks").update({ 
+      completed: !completed, 
+      completed_at: !completed ? new Date().toISOString() : null 
+    }).eq("id", id);
+    
     fetchTasks();
-    if (!completed) toast({ title: "Task completed!" });
+    
+    if (!completed) {
+      // Show celebration with task-specific quote
+      setCelebrationQuote(`"${task?.title}" - Done! Keep crushing it.`);
+      setShowCelebration(true);
+      toast({ title: "Task completed! 🎉" });
+    }
   };
 
   const completedCount = tasks.filter(t => t.completed).length;
@@ -73,12 +121,30 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-hero pb-24">
+      <CelebrationOverlay 
+        show={showCelebration} 
+        quote={celebrationQuote}
+        onComplete={() => setShowCelebration(false)} 
+      />
+
       <header className="p-4 pt-6">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="text-muted-foreground text-sm">{format(new Date(), "EEEE, MMMM d")}</p>
-          <h1 className="text-2xl font-display font-bold text-foreground">
-            Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}
-          </h1>
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
+          <div>
+            <p className="text-muted-foreground text-sm">{format(new Date(), "EEEE, MMMM d")}</p>
+            <h1 className="text-2xl font-display font-bold text-foreground">
+              Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}
+            </h1>
+          </div>
+          {streak > 0 && (
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="streak-badge"
+            >
+              <Flame className="w-4 h-4" />
+              {streak} day{streak !== 1 ? 's' : ''}
+            </motion.div>
+          )}
         </motion.div>
       </header>
 
@@ -90,11 +156,20 @@ export default function Dashboard() {
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Today's Progress</p>
               <p className="text-2xl font-display font-bold">{completedCount}/{tasks.length} tasks</p>
-              <p className="text-xs text-primary flex items-center gap-1 mt-1">
-                <Sparkles className="w-3 h-3" />
-                {motivationalMessage}
-              </p>
             </div>
+          </div>
+        </motion.div>
+
+        {/* Motivational Quote Card */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.15 }}
+          className="quote-card"
+        >
+          <div className="flex items-start gap-3">
+            <Quote className="w-5 h-5 opacity-60 flex-shrink-0 mt-0.5" />
+            <p className="text-base font-medium">{motivationalMessage}</p>
           </div>
         </motion.div>
 

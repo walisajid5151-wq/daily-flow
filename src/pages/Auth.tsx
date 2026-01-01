@@ -34,7 +34,7 @@ export default function Auth() {
       } else {
         const { error } = await signUp(email, password, fullName);
         if (error) throw error;
-        toast({ title: "Account created!", description: "Welcome to FocusFlow." });
+        toast({ title: "Account created!", description: "Welcome to Planit." });
       }
     } catch (error: any) {
       toast({
@@ -58,7 +58,7 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-primary mb-4">
             <Clock className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-display font-bold text-foreground">FocusFlow</h1>
+          <h1 className="text-3xl font-display font-bold text-foreground">Planit</h1>
           <p className="text-muted-foreground mt-2">Your productivity companion</p>
         </div>
 
