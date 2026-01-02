@@ -17,8 +17,16 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onToggle, delay = 0 }: TaskCardProps) {
-  const priorityClass = task.priority === "high" ? "priority-high" : task.priority === "medium" ? "priority-medium" : "priority-low";
-
+  const getPriorityStyles = () => {
+    switch (task.priority) {
+      case 'high':
+        return 'bg-destructive/20 text-destructive border-destructive/30';
+      case 'medium':
+        return 'bg-warning/20 text-warning border-warning/30';
+      default:
+        return 'bg-muted text-muted-foreground border-border';
+    }
+  };
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -44,8 +52,8 @@ export function TaskCard({ task, onToggle, delay = 0 }: TaskCardProps) {
               {task.scheduled_time.slice(0, 5)}
             </span>
           )}
-          <span className={`text-xs px-2 py-0.5 rounded-full ${priorityClass}`}>
-            {task.priority}
+          <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityStyles()}`}>
+            {task.priority.toUpperCase()}
           </span>
         </div>
       </div>

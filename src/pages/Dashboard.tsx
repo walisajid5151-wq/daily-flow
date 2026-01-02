@@ -8,12 +8,15 @@ import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/BottomNav";
 import { TaskCard } from "@/components/TaskCard";
 import { QuickActions } from "@/components/QuickActions";
-import { ProgressRing } from "@/components/ProgressRing";
+import { DayProgressCircle } from "@/components/DayProgressCircle";
 import { CelebrationOverlay } from "@/components/CelebrationOverlay";
 import { StreakCard } from "@/components/StreakCard";
+import { HighPriorityModal } from "@/components/HighPriorityModal";
+import { DaySummaryCard } from "@/components/DaySummaryCard";
 import { useExamReminders } from "@/hooks/useExamReminders";
+import { useDaySettings } from "@/hooks/useDaySettings";
 import { Plus, Calendar, Target, Quote } from "lucide-react";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 interface Task {
   id: string;
@@ -47,11 +50,17 @@ export default function Dashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isEndOfDay } = useDaySettings();
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [motivationalMessage, setMotivationalMessage] = useState("");
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationQuote, setCelebrationQuote] = useState("");
+  
+  // High priority modal state
+  const [showHighPriorityModal, setShowHighPriorityModal] = useState(false);
+  const [pendingHighPriorityTask, setPendingHighPriorityTask] = useState<Task | null>(null);
 
   // Enable exam reminders
   useExamReminders(user?.id);
@@ -67,6 +76,27 @@ export default function Dashboard() {
       generateMotivation();
     }
   }, [user]);
+
+  // Check for incomplete high priority tasks at end of day
+  useEffect(() => {
+    if (isEndOfDay() && tasks.length > 0) {
+      const incompleteHighPriority = tasks.filter(
+        t => !t.completed && t.priority === 'high'
+      );
+      
+      if (incompleteHighPriority.length > 0 && !showHighPriorityModal) {
+        // Check if we've already shown the modal today
+        const lastPrompt = localStorage.getItem('planit-last-hp-prompt');
+        const today = format(new Date(), 'yyyy-MM-dd');
+        
+        if (lastPrompt !== today) {
+          setPendingHighPriorityTask(incompleteHighPriority[0]);
+          setShowHighPriorityModal(true);
+          localStorage.setItem('planit-last-hp-prompt', today);
+        }
+      }
+    }
+  }, [tasks, isEndOfDay]);
 
   const fetchTasks = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -88,7 +118,6 @@ export default function Dashboard() {
     const today = format(new Date(), "yyyy-MM-dd");
     const allPracticedToday = skills.length > 0 && skills.every(s => s.last_practiced_at === today);
     
-    // Get minimum streak among all skills (you're only as strong as your weakest link)
     if (skills.length === 0) return 0;
     
     const minStreak = Math.min(...skills.map(s => s.streak_count || 0));
@@ -115,6 +144,29 @@ export default function Dashboard() {
     }
   };
 
+  const handleMoveToTomorrow = async () => {
+    if (!pendingHighPriorityTask || !user) return;
+    
+    const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
+    
+    await supabase.from("tasks").update({
+      scheduled_date: tomorrow,
+      completed: false,
+      completed_at: null,
+    }).eq("id", pendingHighPriorityTask.id);
+    
+    setShowHighPriorityModal(false);
+    setPendingHighPriorityTask(null);
+    fetchTasks();
+    
+    toast({ title: "Task moved to tomorrow" });
+  };
+
+  const handleSkipTask = () => {
+    setShowHighPriorityModal(false);
+    setPendingHighPriorityTask(null);
+  };
+
   const completedCount = tasks.filter(t => t.completed).length;
   const progress = tasks.length ? (completedCount / tasks.length) * 100 : 0;
 
@@ -125,6 +177,9 @@ export default function Dashboard() {
     targetMinutes: s.target_minutes_daily
   }));
 
+  const completedTasks = tasks.filter(t => t.completed);
+  const skippedTasks = tasks.filter(t => !t.completed);
+
   if (loading) return <div className="min-h-screen bg-gradient-hero flex items-center justify-center"><div className="animate-pulse">Loading...</div></div>;
 
   return (
@@ -133,6 +188,13 @@ export default function Dashboard() {
         show={showCelebration} 
         quote={celebrationQuote}
         onComplete={() => setShowCelebration(false)} 
+      />
+
+      <HighPriorityModal
+        isOpen={showHighPriorityModal}
+        taskTitle={pendingHighPriorityTask?.title || ""}
+        onConfirm={handleMoveToTomorrow}
+        onSkip={handleSkipTask}
       />
 
       <header className="p-4 pt-6">
@@ -154,14 +216,21 @@ export default function Dashboard() {
           onViewSkills={() => navigate("/skills")}
         />
 
-        {/* Progress Card */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
-          <div className="flex items-center gap-4">
-            <ProgressRing progress={progress} size={80} />
-            <div className="flex-1">
-              <p className="text-sm text-muted-foreground">Today's Progress</p>
-              <p className="text-2xl font-display font-bold">{completedCount}/{tasks.length} tasks</p>
-            </div>
+        {/* 12-Hour Day Progress Circle */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.1 }} 
+          className="glass-card p-6"
+        >
+          <div className="flex flex-col items-center">
+            <DayProgressCircle 
+              progress={progress} 
+              completedCount={completedCount}
+              totalCount={tasks.length}
+              size={160}
+            />
+            <p className="text-sm text-muted-foreground mt-4">Today's Progress</p>
           </div>
         </motion.div>
 
@@ -177,6 +246,13 @@ export default function Dashboard() {
             <p className="text-base font-medium">{motivationalMessage}</p>
           </div>
         </motion.div>
+
+        {/* Day Summary (shows at end of day) */}
+        <DaySummaryCard 
+          completedTasks={completedTasks}
+          skippedTasks={skippedTasks}
+          isEndOfDay={isEndOfDay()}
+        />
 
         {/* Quick Actions */}
         <QuickActions />

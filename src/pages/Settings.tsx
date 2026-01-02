@@ -9,20 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useTheme, THEMES } from "@/hooks/useTheme";
+import { useDaySettings } from "@/hooks/useDaySettings";
 import { BottomNav } from "@/components/BottomNav";
-import { ArrowLeft, Moon, Bell, Clock, Volume2, LogOut, User, Palette, Flame } from "lucide-react";
+import { ArrowLeft, Moon, Bell, Clock, Volume2, LogOut, User, Palette, Sun, Sunrise, Sunset } from "lucide-react";
 
 export default function Settings() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isDark, themeColor, setDarkMode, setTheme } = useTheme();
+  const { dayStart, dayEnd, updateDayStart, updateDayEnd } = useDaySettings();
+  
   const [notifications, setNotifications] = useState(true);
   const [focusDuration, setFocusDuration] = useState("25");
   const [snoozeDuration, setSnoozeDuration] = useState("5");
-  const [streak, setStreak] = useState(0);
-  const [editingStreak, setEditingStreak] = useState(false);
-  const [tempStreak, setTempStreak] = useState("0");
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -47,34 +47,6 @@ export default function Settings() {
       setFocusDuration(String(data.daily_focus_minutes ?? 25));
       setSnoozeDuration(String(data.snooze_duration ?? 5));
     }
-
-    // Fetch streak from daily_reviews
-    const today = new Date().toISOString().split('T')[0];
-    const { data: reviews } = await supabase
-      .from("daily_reviews")
-      .select("review_date, all_completed")
-      .eq("user_id", user.id)
-      .order("review_date", { ascending: false })
-      .limit(30);
-
-    if (reviews && reviews.length > 0) {
-      let currentStreak = 0;
-      const dates = reviews.filter(r => r.all_completed).map(r => r.review_date);
-      
-      for (let i = 0; i < 30; i++) {
-        const checkDate = new Date();
-        checkDate.setDate(checkDate.getDate() - i);
-        const dateStr = checkDate.toISOString().split('T')[0];
-        
-        if (dates.includes(dateStr)) {
-          currentStreak++;
-        } else if (i > 0) {
-          break;
-        }
-      }
-      setStreak(currentStreak);
-      setTempStreak(String(currentStreak));
-    }
   };
 
   const updateProfile = async (field: string, value: any) => {
@@ -83,31 +55,6 @@ export default function Settings() {
       .from("profiles")
       .update({ [field]: value, updated_at: new Date().toISOString() })
       .eq("id", user.id);
-  };
-
-  const handleStreakSave = async () => {
-    const newStreak = parseInt(tempStreak) || 0;
-    setStreak(newStreak);
-    setEditingStreak(false);
-    
-    // Create/update daily reviews to reflect the streak
-    if (user && newStreak > 0) {
-      for (let i = 0; i < newStreak; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        await supabase
-          .from("daily_reviews")
-          .upsert({
-            user_id: user.id,
-            review_date: dateStr,
-            all_completed: true
-          }, { onConflict: 'user_id,review_date' });
-      }
-    }
-    
-    toast({ title: "Streak updated!" });
   };
 
   const handleSignOut = async () => {
@@ -138,37 +85,6 @@ export default function Settings() {
               <p className="font-medium text-foreground">{user?.email}</p>
               <p className="text-sm text-muted-foreground">Planit User</p>
             </div>
-            <div className="streak-badge">
-              <Flame className="w-4 h-4" />
-              {streak} day{streak !== 1 ? 's' : ''}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Streak Adjustment */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }} className="glass-card p-4 space-y-4">
-          <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider">Streak</h3>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Flame className="w-5 h-5 text-accent" />
-              <span className="text-foreground">Current Streak</span>
-            </div>
-            {editingStreak ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  value={tempStreak}
-                  onChange={(e) => setTempStreak(e.target.value)}
-                  className="w-20 h-8 text-center"
-                  min="0"
-                />
-                <Button size="sm" onClick={handleStreakSave}>Save</Button>
-              </div>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setEditingStreak(true)}>
-                {streak} days - Edit
-              </Button>
-            )}
           </div>
         </motion.div>
 
@@ -177,8 +93,8 @@ export default function Settings() {
           <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider">Appearance</h3>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Moon className="w-5 h-5 text-muted-foreground" />
-              <span className="text-foreground">Dark Mode</span>
+              {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
+              <span className="text-foreground">{isDark ? "Dark Mode" : "Light Mode"}</span>
             </div>
             <Switch checked={isDark} onCheckedChange={setDarkMode} />
           </div>
@@ -200,6 +116,38 @@ export default function Settings() {
                 />
               ))}
             </div>
+          </div>
+        </motion.div>
+
+        {/* 12-Hour Day Settings */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="glass-card p-4 space-y-4">
+          <h3 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider">12-Hour Day</h3>
+          <p className="text-xs text-muted-foreground">Set your active day window for task scheduling</p>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sunrise className="w-5 h-5 text-muted-foreground" />
+              <span className="text-foreground">Day Starts</span>
+            </div>
+            <Input
+              type="time"
+              value={dayStart}
+              onChange={(e) => updateDayStart(e.target.value)}
+              className="w-28"
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sunset className="w-5 h-5 text-muted-foreground" />
+              <span className="text-foreground">Day Ends</span>
+            </div>
+            <Input
+              type="time"
+              value={dayEnd}
+              onChange={(e) => updateDayEnd(e.target.value)}
+              className="w-28"
+            />
           </div>
         </motion.div>
 
