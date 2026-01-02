@@ -15,7 +15,8 @@ export const THEMES: { id: ThemeColor; name: string; color: string }[] = [
 export function useTheme() {
   const [isDark, setIsDark] = useState(() => {
     const stored = localStorage.getItem("planit-dark-mode");
-    return stored !== null ? stored === "true" : true; // Default to dark mode
+    // Default to dark mode (true) if nothing is stored
+    return stored !== null ? stored === "true" : true;
   });
 
   const [themeColor, setThemeColor] = useState<ThemeColor>(() => {
@@ -23,6 +24,7 @@ export function useTheme() {
     return (stored as ThemeColor) || "teal";
   });
 
+  // Apply theme on mount and whenever it changes
   useEffect(() => {
     const root = document.documentElement;
     
@@ -47,6 +49,16 @@ export function useTheme() {
     }
     localStorage.setItem("planit-theme-color", themeColor);
   }, [isDark, themeColor]);
+
+  // Also apply on initial mount to ensure dark mode is set
+  useEffect(() => {
+    const root = document.documentElement;
+    // Force dark mode on initial load if no preference stored
+    if (localStorage.getItem("planit-dark-mode") === null) {
+      root.classList.add("dark");
+      localStorage.setItem("planit-dark-mode", "true");
+    }
+  }, []);
 
   const toggleDarkMode = () => setIsDark(prev => !prev);
   const setDarkMode = (value: boolean) => setIsDark(value);
