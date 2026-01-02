@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "preview": "vite preview"
   },
-  "dependencies": "firebase": "^10.15.0"
+  "dependencies": "firebase": "^10.15.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
@@ -68,7 +68,7 @@
     "vite-plugin-pwa": "^1.2.0",
     "zod": "^3.25.76"
   },
-  "devDependencies":"firebase": "^10.15.0"
+  "devDependencies":"firebase": "^10.15.0",
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22.16.5",
