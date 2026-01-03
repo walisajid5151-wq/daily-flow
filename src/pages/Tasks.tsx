@@ -24,7 +24,7 @@ interface Task {
 }
 
 export default function Tasks() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -32,32 +32,42 @@ export default function Tasks() {
   const [newTask, setNewTask] = useState({ title: "", time: "", duration: "30", priority: "medium" });
 
   useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
+    if (!loading && (!user || !supabaseUser)) navigate("/auth");
+  }, [user, supabaseUser, loading, navigate]);
 
   useEffect(() => {
-    if (user) fetchTasks();
-  }, [user]);
+    if (supabaseUser) fetchTasks();
+  }, [supabaseUser]);
 
   const fetchTasks = async () => {
-    const { data } = await supabase
+    if (!supabaseUser) return;
+    const { data, error } = await supabase
       .from("tasks")
       .select("*")
+      .eq("user_id", supabaseUser.id)
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time");
+    if (error) {
+      toast({ title: "Failed to load tasks", description: error.message });
+      return;
+    }
     if (data) setTasks(data);
   };
 
   const addTask = async () => {
-    if (!newTask.title.trim()) return;
-    await supabase.from("tasks").insert({
-      user_id: user!.id,
+    if (!newTask.title.trim() || !supabaseUser) return;
+    const { error } = await supabase.from("tasks").insert({
+      user_id: supabaseUser.id,
       title: newTask.title,
       scheduled_time: newTask.time || null,
       duration_minutes: parseInt(newTask.duration),
       priority: newTask.priority,
       scheduled_date: format(new Date(), "yyyy-MM-dd")
     });
+    if (error) {
+      toast({ title: "Failed to add task", description: error.message });
+      return;
+    }
     setNewTask({ title: "", time: "", duration: "30", priority: "medium" });
     setIsOpen(false);
     fetchTasks();
@@ -70,7 +80,11 @@ export default function Tasks() {
   };
 
   const deleteTask = async (id: string) => {
-    await supabase.from("tasks").delete().eq("id", id);
+    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Failed to delete task", description: error.message });
+      return;
+    }
     fetchTasks();
     toast({ title: "Task deleted" });
   };

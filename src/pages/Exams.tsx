@@ -20,7 +20,7 @@ interface Exam {
 }
 
 export default function Exams() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [exams, setExams] = useState<Exam[]>([]);
@@ -28,27 +28,39 @@ export default function Exams() {
   const [newExam, setNewExam] = useState({ title: "", subject: "", date: "", time: "" });
 
   useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
+    if (!loading && (!user || !supabaseUser)) navigate("/auth");
+  }, [user, supabaseUser, loading, navigate]);
 
   useEffect(() => {
-    if (user) fetchExams();
-  }, [user]);
+    if (supabaseUser) fetchExams();
+  }, [supabaseUser]);
 
   const fetchExams = async () => {
-    const { data } = await supabase.from("exams").select("*").order("exam_date");
+    if (!supabaseUser) return;
+    const { data, error } = await supabase.from("exams")
+      .select("*")
+      .eq("user_id", supabaseUser.id)
+      .order("exam_date");
+    if (error) {
+      toast({ title: "Failed to load exams", description: error.message });
+      return;
+    }
     if (data) setExams(data);
   };
 
   const addExam = async () => {
-    if (!newExam.title.trim() || !newExam.date) return;
-    await supabase.from("exams").insert({
-      user_id: user!.id,
+    if (!newExam.title.trim() || !newExam.date || !supabaseUser) return;
+    const { error } = await supabase.from("exams").insert({
+      user_id: supabaseUser.id,
       title: newExam.title,
       subject: newExam.subject || null,
       exam_date: newExam.date,
       exam_time: newExam.time || null
     });
+    if (error) {
+      toast({ title: "Failed to add exam", description: error.message });
+      return;
+    }
     setNewExam({ title: "", subject: "", date: "", time: "" });
     setIsOpen(false);
     fetchExams();
@@ -56,7 +68,11 @@ export default function Exams() {
   };
 
   const deleteExam = async (id: string) => {
-    await supabase.from("exams").delete().eq("id", id);
+    const { error } = await supabase.from("exams").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Failed to delete exam", description: error.message });
+      return;
+    }
     fetchExams();
     toast({ title: "Exam deleted" });
   };

@@ -21,11 +21,14 @@ export function QuickActions({ onRefresh, userId }: QuickActionsProps) {
   const { toast } = useToast();
 
   const handleAction = async (actionType: string) => {
-    if (!userId) return;
+    if (!userId) {
+      toast({ title: "Please log in to save your progress." });
+      return;
+    }
 
     try {
       if (actionType === "addSkill") {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from("skills")
           .insert([{ name: "New Skill", target_minutes_daily: 30, streak_count: 0, user_id: userId }]);
         if (error) throw error;
@@ -34,9 +37,9 @@ export function QuickActions({ onRefresh, userId }: QuickActionsProps) {
 
       if (actionType === "addExam") {
         const today = new Date().toISOString().split("T")[0];
-        const { data, error } = await supabase
-          .from("tasks")
-          .insert([{ title: "New Exam", scheduled_date: today, duration_minutes: 60, completed: false, priority: "high", user_id: userId }]);
+        const { error } = await supabase
+          .from("exams")
+          .insert([{ title: "New Exam", exam_date: today, exam_time: null, subject: null, user_id: userId }]);
         if (error) throw error;
         toast({ title: "Exam created ✅" });
       }

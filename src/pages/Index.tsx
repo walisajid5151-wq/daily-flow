@@ -3,14 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading) {
-      navigate(user ? "/dashboard" : "/auth");
+      navigate(user && supabaseUser ? "/dashboard" : "/auth");
     }
-  }, [user, loading, navigate]);
+  }, [user, supabaseUser, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center">

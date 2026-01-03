@@ -9,9 +9,12 @@ import {
   User as FirebaseUser
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: FirebaseUser | null;
+  supabaseUser: SupabaseUser | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -22,18 +25,57 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const initSupabaseUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setSupabaseUser(data.user ?? null);
+    };
+
+    initSupabaseUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
 
       // Update streak when user logs in
-      if (u) await updateStreak(u.uid);
+      if (u) updateStreak(u.uid);
     });
     return () => unsubscribe();
   }, []);
+
+  const ensureSupabaseSession = async (email: string, password: string, fullName?: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      if (error.message?.toLowerCase().includes("invalid")) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName } }
+        });
+        if (signUpError) throw signUpError;
+        setSupabaseUser(signUpData.user);
+        return signUpData.user;
+      }
+      throw error;
+    }
+
+    setSupabaseUser(data.user);
+    return data.user;
+  };
 
   const updateStreak = async (uid: string) => {
     try {
@@ -80,6 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update streak after signup
       await updateStreak(userCredential.user.uid);
 
+      // Ensure Supabase account & session for data storage
+      await ensureSupabaseSession(email, password, fullName);
+
       return { error: null };
     } catch (e: any) {
       return { error: e };
@@ -93,6 +138,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Update streak after sign in
       await updateStreak(userCredential.user.uid);
 
+      // Sign in to Supabase for RLS-secured tables
+      await ensureSupabaseSession(email, password);
+
       return { error: null };
     } catch (e: any) {
       return { error: e };
@@ -100,11 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await supabase.auth.signOut();
     await firebaseSignOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, supabaseUser, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
