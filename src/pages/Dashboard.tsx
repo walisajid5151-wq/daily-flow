@@ -59,11 +59,9 @@ export default function Dashboard() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationQuote, setCelebrationQuote] = useState("");
 
-  // High priority modal state
   const [showHighPriorityModal, setShowHighPriorityModal] = useState(false);
   const [pendingHighPriorityTask, setPendingHighPriorityTask] = useState<Task | null>(null);
 
-  // Enable exam reminders
   useExamReminders(user?.id);
 
   useEffect(() => {
@@ -78,7 +76,6 @@ export default function Dashboard() {
     }
   }, [user]);
 
-  // Check for incomplete high priority tasks at end of day
   useEffect(() => {
     if (isEndOfDay() && tasks.length > 0) {
       const incompleteHighPriority = tasks.filter(
@@ -320,7 +317,14 @@ export default function Dashboard() {
         />
 
         {/* Quick Actions: Call addTask on click */}
-        <QuickActions addTask={addTask} />
+        <QuickActions
+          addTask={addTask}
+          userId={user?.id}
+          onRefresh={() => {
+            fetchTasks();
+            fetchSkills();
+          }}
+        />
 
         <section>
           <div className="flex items-center justify-between mb-3">
