@@ -24,7 +24,7 @@ interface Task {
 }
 
 export default function Tasks() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -36,13 +36,15 @@ export default function Tasks() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) fetchTasks();
-  }, [user]);
+    if (supabaseUser) fetchTasks();
+  }, [supabaseUser]);
 
   const fetchTasks = async () => {
+    if (!supabaseUser) return;
     const { data } = await supabase
       .from("tasks")
       .select("*")
+      .eq("user_id", supabaseUser.id)
       .order("scheduled_date", { ascending: true })
       .order("scheduled_time");
     if (data) setTasks(data);
@@ -50,14 +52,18 @@ export default function Tasks() {
 
   const addTask = async () => {
     if (!newTask.title.trim()) return;
-    await supabase.from("tasks").insert({
-      user_id: user!.id,
+    const { error } = await supabase.from("tasks").insert({
+      user_id: supabaseUser!.id,
       title: newTask.title,
       scheduled_time: newTask.time || null,
       duration_minutes: parseInt(newTask.duration),
       priority: newTask.priority,
       scheduled_date: format(new Date(), "yyyy-MM-dd")
     });
+    if (error) {
+      toast({ title: "Failed to add task", description: error.message });
+      return;
+    }
     setNewTask({ title: "", time: "", duration: "30", priority: "medium" });
     setIsOpen(false);
     fetchTasks();
@@ -65,11 +71,13 @@ export default function Tasks() {
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
+    if (!supabaseUser) return;
     await supabase.from("tasks").update({ completed: !completed, completed_at: !completed ? new Date().toISOString() : null }).eq("id", id);
     fetchTasks();
   };
 
   const deleteTask = async (id: string) => {
+    if (!supabaseUser) return;
     await supabase.from("tasks").delete().eq("id", id);
     fetchTasks();
     toast({ title: "Task deleted" });

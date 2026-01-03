@@ -20,7 +20,7 @@ interface Exam {
 }
 
 export default function Exams() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [exams, setExams] = useState<Exam[]>([]);
@@ -32,23 +32,28 @@ export default function Exams() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) fetchExams();
-  }, [user]);
+    if (supabaseUser) fetchExams();
+  }, [supabaseUser]);
 
   const fetchExams = async () => {
-    const { data } = await supabase.from("exams").select("*").order("exam_date");
+    if (!supabaseUser) return;
+    const { data } = await supabase.from("exams").select("*").eq("user_id", supabaseUser.id).order("exam_date");
     if (data) setExams(data);
   };
 
   const addExam = async () => {
     if (!newExam.title.trim() || !newExam.date) return;
-    await supabase.from("exams").insert({
-      user_id: user!.id,
+    const { error } = await supabase.from("exams").insert({
+      user_id: supabaseUser!.id,
       title: newExam.title,
       subject: newExam.subject || null,
       exam_date: newExam.date,
       exam_time: newExam.time || null
     });
+    if (error) {
+      toast({ title: "Failed to add exam", description: error.message });
+      return;
+    }
     setNewExam({ title: "", subject: "", date: "", time: "" });
     setIsOpen(false);
     fetchExams();
@@ -56,6 +61,7 @@ export default function Exams() {
   };
 
   const deleteExam = async (id: string) => {
+    if (!supabaseUser) return;
     await supabase.from("exams").delete().eq("id", id);
     fetchExams();
     toast({ title: "Exam deleted" });

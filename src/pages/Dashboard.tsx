@@ -48,7 +48,7 @@ const MOTIVATIONAL_MESSAGES = [
 ];
 
 export default function Dashboard() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isEndOfDay } = useDaySettings();
@@ -69,12 +69,12 @@ export default function Dashboard() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (supabaseUser) {
       fetchTasks();
       fetchSkills();
       generateMotivation();
     }
-  }, [user]);
+  }, [supabaseUser]);
 
   useEffect(() => {
     if (isEndOfDay() && tasks.length > 0) {
@@ -96,23 +96,23 @@ export default function Dashboard() {
   }, [tasks, isEndOfDay, showHighPriorityModal]);
 
   const fetchTasks = async () => {
-    if (!user) return;
+    if (!supabaseUser) return;
     const today = format(new Date(), "yyyy-MM-dd");
     const { data } = await supabase
       .from("tasks")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", supabaseUser.id)
       .eq("scheduled_date", today)
       .order("scheduled_time");
     if (data) setTasks(data as Task[]);
   };
 
   const fetchSkills = async () => {
-    if (!user) return;
+    if (!supabaseUser) return;
     const { data } = await supabase
       .from("skills")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", supabaseUser.id)
       .order("created_at");
     if (data) setSkills(data as Skill[]);
   };
@@ -163,7 +163,7 @@ export default function Dashboard() {
     type: "daily" | "exam" | "skill",
     scheduledDate: string | null = format(new Date(), "yyyy-MM-dd")
   ) => {
-    if (!user) return;
+    if (!supabaseUser) return;
 
     const { data, error } = await supabase
       .from("tasks")
@@ -173,7 +173,7 @@ export default function Dashboard() {
           type,
           scheduled_date: scheduledDate,
           completed: false,
-          user_id: user.id,
+          user_id: supabaseUser.id,
           priority: type === "exam" ? "high" : "normal",
         },
       ])
@@ -190,7 +190,7 @@ export default function Dashboard() {
   };
 
   const handleMoveToTomorrow = async () => {
-    if (!pendingHighPriorityTask || !user) return;
+    if (!pendingHighPriorityTask || !supabaseUser) return;
 
     const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
 
@@ -316,10 +316,8 @@ export default function Dashboard() {
           isEndOfDay={isEndOfDay()}
         />
 
-        {/* Quick Actions: Call addTask on click */}
         <QuickActions
-          addTask={addTask}
-          userId={user?.id}
+          userId={supabaseUser?.id}
           onRefresh={() => {
             fetchTasks();
             fetchSkills();

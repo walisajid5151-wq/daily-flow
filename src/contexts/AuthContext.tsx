@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { auth, db } from "@/firebase";
+import { supabase } from "@/integrations/supabase/client";
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -9,9 +10,11 @@ import {
   User as FirebaseUser
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: FirebaseUser | null;
+  supabaseUser: SupabaseUser | null;
   loading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -22,7 +25,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const initializeSupabaseSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      setSupabaseUser(data.session?.user ?? null);
+    };
+
+    initializeSupabaseSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      setSupabaseUser(session?.user ?? null);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -34,6 +53,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => unsubscribe();
   }, []);
+
+  const syncSupabaseAccount = async (email: string, password: string) => {
+    // Try to sign in the Supabase user; if it doesn't exist, create it.
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) {
+        return { error: signUpError as unknown as Error };
+      }
+      setSupabaseUser(signUpData.user ?? null);
+      return { error: null };
+    }
+
+    setSupabaseUser(signInData.user ?? null);
+    return { error: null };
+  };
 
   const updateStreak = async (uid: string) => {
     try {
@@ -77,6 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const { error: supabaseError } = await syncSupabaseAccount(email, password);
+      if (supabaseError) return { error: supabaseError };
+
       // Update streak after signup
       await updateStreak(userCredential.user.uid);
 
@@ -90,6 +129,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
+      const { error: supabaseError } = await syncSupabaseAccount(email, password);
+      if (supabaseError) return { error: supabaseError };
+
       // Update streak after sign in
       await updateStreak(userCredential.user.uid);
 
@@ -100,11 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await supabase.auth.signOut();
     await firebaseSignOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, supabaseUser, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
