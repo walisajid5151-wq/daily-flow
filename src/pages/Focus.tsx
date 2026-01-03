@@ -24,7 +24,7 @@ const QUOTES = [
 ];
 
 export default function Focus() {
-  const { user, loading } = useAuth();
+  const { user, supabaseUser, loading } = useAuth();
   const navigate = useNavigate();
   const { notify, playSound } = useNotification();
   const [workDuration, setWorkDuration] = useState(25);
@@ -33,8 +33,8 @@ export default function Focus() {
   const timer = usePomodoroTimer(workDuration, BREAK_DURATION);
 
   useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
+    if (!loading && (!user || !supabaseUser)) navigate("/auth");
+  }, [user, supabaseUser, loading, navigate]);
 
   useEffect(() => {
     setCurrentQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
@@ -68,9 +68,9 @@ export default function Focus() {
       
       timer.completeSession();
 
-      if (user) {
+      if (supabaseUser) {
         await supabase.from("focus_sessions").insert({
-          user_id: user.id,
+          user_id: supabaseUser.id,
           duration_minutes: workDuration,
           session_type: "focus",
           completed: true,

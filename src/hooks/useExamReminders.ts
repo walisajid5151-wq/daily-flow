@@ -19,6 +19,7 @@ export function useExamReminders(userId: string | undefined) {
     const { data: exams } = await supabase
       .from("exams")
       .select("*")
+      .eq("user_id", userId)
       .gte("exam_date", format(new Date(), "yyyy-MM-dd"))
       .order("exam_date");
 
