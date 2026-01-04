@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Check, Clock } from "lucide-react";
+import { Check, Clock, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Task {
   id: string;
@@ -13,10 +14,13 @@ interface Task {
 interface TaskCardProps {
   task: Task;
   onToggle: (id: string, completed: boolean) => void;
+  onDelete?: () => void;
+  index?: number;
   delay?: number;
 }
 
-export function TaskCard({ task, onToggle, delay = 0 }: TaskCardProps) {
+export function TaskCard({ task, onToggle, onDelete, index = 0, delay }: TaskCardProps) {
+  const animationDelay = delay ?? index * 0.05;
   const getPriorityStyles = () => {
     switch (task.priority) {
       case 'high':
@@ -31,7 +35,7 @@ export function TaskCard({ task, onToggle, delay = 0 }: TaskCardProps) {
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay }}
+      transition={{ delay: animationDelay }}
       className={`glass-card p-4 flex items-center gap-3 ${task.completed ? "opacity-60" : ""}`}
     >
       <button
@@ -57,6 +61,20 @@ export function TaskCard({ task, onToggle, delay = 0 }: TaskCardProps) {
           </span>
         </div>
       </div>
+
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive h-8 w-8"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
     </motion.div>
   );
 }
