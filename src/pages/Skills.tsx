@@ -1,197 +1,130 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { BottomNav } from "@/components/BottomNav";
-import { ArrowLeft, Plus, Zap, Flame, Play, Check } from "lucide-react";
-import confetti from "canvas-confetti";
+ import { useState, useEffect } from "react";
+ import { useNavigate } from "react-router-dom";
+ import { motion, AnimatePresence } from "framer-motion";
+ import { useAuth } from "@/contexts/AuthContext";
+ import { supabase } from "@/integrations/supabase/client";
+ import { Button } from "@/components/ui/button";
+ import { Input } from "@/components/ui/input";
+ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+ import { useToast } from "@/hooks/use-toast";
+ import { BottomNav } from "@/components/BottomNav";
+ import { ArrowLeft, Plus, Zap, Flame, Play, Check } from "lucide-react";
+ import confetti from "canvas-confetti";
+ 
+ interface Skill {
+   id: string;
+   name: string;
+   target_minutes_daily: number;
+   streak_count: number;
+   last_practiced_at: string | null;
+ }
+ 
+ export default function Skills() {
+-  const { user, loading } = useAuth();
++  const { user, supabaseUser, loading } = useAuth();
+   const navigate = useNavigate();
+   const { toast } = useToast();
+   const [skills, setSkills] = useState<Skill[]>([]);
+   const [isOpen, setIsOpen] = useState(false);
+   const [practicing, setPracticing] = useState<string | null>(null);
+   const [showCelebration, setShowCelebration] = useState(false);
+   const [completedSkillName, setCompletedSkillName] = useState("");
+   const [newSkill, setNewSkill] = useState({ name: "", target: "30" });
+ 
+   const quotes: Record<string, string[]> = {
+     default: [
+       "Consistency beats intensity.",
+       "You showed up. That's what matters.",
+       "Progress, not perfection."
+     ]
+   };
+ 
+   useEffect(() => {
+     if (!loading && !user) navigate("/auth");
+   }, [user, loading, navigate]);
+ 
+   useEffect(() => {
+-    if (user) fetchSkills();
+-  }, [user]);
++    if (supabaseUser) fetchSkills();
++  }, [supabaseUser]);
+ 
+   const fetchSkills = async () => {
+-    const { data } = await supabase.from("skills").select("*").order("created_at");
++    if (!supabaseUser) return;
++    const { data } = await supabase.from("skills").select("*").eq("user_id", supabaseUser.id).order("created_at");
+     if (data) setSkills(data);
+   };
+ 
+   const addSkill = async () => {
+     if (!newSkill.name.trim()) return;
+-    await supabase.from("skills").insert({
+-      user_id: user!.id,
++    const { error } = await supabase.from("skills").insert({
++      user_id: supabaseUser!.id,
+       name: newSkill.name,
+       target_minutes_daily: parseInt(newSkill.target)
+     });
++    if (error) {
++      toast({ title: "Failed to add skill", description: error.message });
++      return;
++    }
+     setNewSkill({ name: "", target: "30" });
+     setIsOpen(false);
+     fetchSkills();
+     toast({ title: "Skill added!" });
+   };
+ 
+   const completePractice = async (skill: Skill) => {
++    if (!supabaseUser) return;
+     const today = new Date().toISOString().split("T")[0];
+     const isNewStreak = skill.last_practiced_at !== today;
+     
+-    await supabase.from("skills").update({
++    const { error: updateError } = await supabase.from("skills").update({
+       last_practiced_at: today,
+       streak_count: isNewStreak ? skill.streak_count + 1 : skill.streak_count
+     }).eq("id", skill.id);
+ 
+-    await supabase.from("skill_logs").insert({
+-      user_id: user!.id,
++    if (updateError) {
++      toast({ title: "Failed to update streak", description: updateError.message });
++      return;
++    }
++
++    const { error: logError } = await supabase.from("skill_logs").insert({
++      user_id: supabaseUser!.id,
+       skill_id: skill.id,
+       duration_minutes: skill.target_minutes_daily
+     });
++    if (logError) {
++      toast({ title: "Failed to log practice", description: logError.message });
++      return;
++    }
+ 
+     setPracticing(null);
+     setCompletedSkillName(skill.name);
+     setShowCelebration(true);
+     
+     confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
+     
+     setTimeout(() => setShowCelebration(false), 3000);
+     fetchSkills();
+   };
+ 
+   if (loading) return null;
+ 
+   const randomQuote = quotes.default[Math.floor(Math.random() * quotes.default.length)];
+ 
+   return (
+     <div className="min-h-screen bg-gradient-hero pb-24">
+       <AnimatePresence>
+         {showCelebration && (
+           <motion.div
+             initial={{ opacity: 0, scale: 0.8 }}
+             animate={{ opacity: 1, scale: 1 }}
+             exit={{ opacity: 0, scale: 0.8 }}
+             className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+           >
 
-interface Skill {
-  id: string;
-  name: string;
-  target_minutes_daily: number;
-  streak_count: number;
-  last_practiced_at: string | null;
-}
-
-export default function Skills() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [practicing, setPracticing] = useState<string | null>(null);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [completedSkillName, setCompletedSkillName] = useState("");
-  const [newSkill, setNewSkill] = useState({ name: "", target: "30" });
-
-  const quotes: Record<string, string[]> = {
-    default: [
-      "Consistency beats intensity.",
-      "You showed up. That's what matters.",
-      "Progress, not perfection."
-    ]
-  };
-
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
-    if (user) fetchSkills();
-  }, [user]);
-
-  const fetchSkills = async () => {
-    const { data } = await supabase.from("skills").select("*").order("created_at");
-    if (data) setSkills(data);
-  };
-
-  const addSkill = async () => {
-    if (!newSkill.name.trim()) return;
-    await supabase.from("skills").insert({
-      user_id: user!.id,
-      name: newSkill.name,
-      target_minutes_daily: parseInt(newSkill.target)
-    });
-    setNewSkill({ name: "", target: "30" });
-    setIsOpen(false);
-    fetchSkills();
-    toast({ title: "Skill added!" });
-  };
-
-  const completePractice = async (skill: Skill) => {
-    const today = new Date().toISOString().split("T")[0];
-    const isNewStreak = skill.last_practiced_at !== today;
-    
-    await supabase.from("skills").update({
-      last_practiced_at: today,
-      streak_count: isNewStreak ? skill.streak_count + 1 : skill.streak_count
-    }).eq("id", skill.id);
-
-    await supabase.from("skill_logs").insert({
-      user_id: user!.id,
-      skill_id: skill.id,
-      duration_minutes: skill.target_minutes_daily
-    });
-
-    setPracticing(null);
-    setCompletedSkillName(skill.name);
-    setShowCelebration(true);
-    
-    confetti({ particleCount: 150, spread: 90, origin: { y: 0.6 } });
-    
-    setTimeout(() => setShowCelebration(false), 3000);
-    fetchSkills();
-  };
-
-  if (loading) return null;
-
-  const randomQuote = quotes.default[Math.floor(Math.random() * quotes.default.length)];
-
-  return (
-    <div className="min-h-screen bg-gradient-hero pb-24">
-      <AnimatePresence>
-        {showCelebration && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-          >
-            <div className="text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.2 }}
-                className="text-6xl mb-4"
-              >
-                🎉
-              </motion.div>
-              <p className="text-lg text-muted-foreground italic">"{randomQuote}"</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <header className="p-4 pt-6 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="text-xl font-display font-bold">Skills</h1>
-      </header>
-
-      <main className="px-4 space-y-4">
-        <div className="flex justify-end">
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1"><Plus className="w-4 h-4" /> Add Skill</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>New Skill</DialogTitle></DialogHeader>
-              <div className="space-y-4 mt-4">
-                <Input placeholder="Skill name (e.g., Guitar, Coding)" value={newSkill.name} onChange={e => setNewSkill({ ...newSkill, name: e.target.value })} />
-                <Input type="number" placeholder="Daily target (minutes)" value={newSkill.target} onChange={e => setNewSkill({ ...newSkill, target: e.target.value })} />
-                <Button className="w-full" onClick={addSkill}>Add Skill</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="space-y-3">
-          {skills.map((skill, i) => {
-            const today = new Date().toISOString().split("T")[0];
-            const practicedToday = skill.last_practiced_at === today;
-            
-            return (
-              <motion.div
-                key={skill.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={`glass-card p-4 ${practicedToday ? "border-2 border-success/50" : ""}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${practicedToday ? "bg-gradient-success" : "bg-gradient-accent"}`}>
-                      {practicedToday ? <Check className="w-5 h-5 text-success-foreground" /> : <Zap className="w-5 h-5 text-accent-foreground" />}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-foreground">{skill.name}</h3>
-                      <p className="text-sm text-muted-foreground">{skill.target_minutes_daily} min/day</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {skill.streak_count > 0 && (
-                      <div className="streak-badge">
-                        <Flame className="w-3 h-3" />
-                        {skill.streak_count}
-                      </div>
-                    )}
-                    {!practicedToday && (
-                      <Button size="sm" variant="outline" className="gap-1" onClick={() => completePractice(skill)}>
-                        <Play className="w-4 h-4" /> Practice
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-          {skills.length === 0 && (
-            <div className="text-center py-12">
-              <Zap className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No skills yet. Add one to start tracking!</p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      <BottomNav />
-    </div>
-  );
-}
