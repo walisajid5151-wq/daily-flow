@@ -3,16 +3,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Flame, ChevronRight, Zap, Calendar, TrendingUp } from "lucide-react";
 import { format, subDays } from "date-fns";
 
-interface SkillStreak {
-  skillName: string;
-  streak: number;
-  lastPracticed: string | null;
-  targetMinutes: number;
+interface Skill {
+  id: string;
+  name: string;
+  target_minutes_daily: number;
+  streak_count: number;
+  last_practiced_at: string | null;
 }
 
 interface StreakCardProps {
-  skills: SkillStreak[];
+  skills: Skill[];
   totalStreak: number;
+  userId?: string;
   onViewSkills?: () => void;
 }
 
@@ -20,8 +22,8 @@ export function StreakCard({ skills, totalStreak, onViewSkills }: StreakCardProp
   const [isExpanded, setIsExpanded] = useState(false);
 
   const today = format(new Date(), "yyyy-MM-dd");
-  const practicedToday = skills.filter(s => s.lastPracticed === today);
-  const pending = skills.filter(s => s.lastPracticed !== today);
+  const practicedToday = skills.filter(s => s.last_practiced_at === today);
+  const pending = skills.filter(s => s.last_practiced_at !== today);
 
   // Generate last 7 days for streak visualization
   const last7Days = Array.from({ length: 7 }, (_, i) => {
@@ -82,7 +84,7 @@ export function StreakCard({ skills, totalStreak, onViewSkills }: StreakCardProp
               </p>
               <div className="flex justify-between gap-1">
                 {last7Days.map((date, i) => {
-                  const hasActivity = skills.some(s => s.lastPracticed === date);
+                  const hasActivity = skills.some(s => s.last_practiced_at === date);
                   return (
                     <div key={date} className="flex-1 flex flex-col items-center gap-1">
                       <motion.div
@@ -113,21 +115,21 @@ export function StreakCard({ skills, totalStreak, onViewSkills }: StreakCardProp
               ) : (
                 <>
                   {practicedToday.map(skill => (
-                    <div key={skill.skillName} className="flex items-center gap-2 py-1.5">
+                    <div key={skill.id} className="flex items-center gap-2 py-1.5">
                       <div className="w-6 h-6 rounded-lg bg-gradient-success flex items-center justify-center">
                         <Zap className="w-3 h-3 text-success-foreground" />
                       </div>
-                      <span className="text-sm text-foreground flex-1">{skill.skillName}</span>
-                      <span className="text-xs text-success">{skill.targetMinutes}m ✓</span>
+                      <span className="text-sm text-foreground flex-1">{skill.name}</span>
+                      <span className="text-xs text-success">{skill.target_minutes_daily}m ✓</span>
                     </div>
                   ))}
                   {pending.map(skill => (
-                    <div key={skill.skillName} className="flex items-center gap-2 py-1.5 opacity-60">
+                    <div key={skill.id} className="flex items-center gap-2 py-1.5 opacity-60">
                       <div className="w-6 h-6 rounded-lg bg-muted flex items-center justify-center">
                         <Zap className="w-3 h-3 text-muted-foreground" />
                       </div>
-                      <span className="text-sm text-foreground flex-1">{skill.skillName}</span>
-                      <span className="text-xs text-muted-foreground">{skill.targetMinutes}m</span>
+                      <span className="text-sm text-foreground flex-1">{skill.name}</span>
+                      <span className="text-xs text-muted-foreground">{skill.target_minutes_daily}m</span>
                     </div>
                   ))}
                 </>

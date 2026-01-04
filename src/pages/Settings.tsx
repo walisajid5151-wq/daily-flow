@@ -14,7 +14,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { ArrowLeft, Moon, Bell, Clock, Volume2, LogOut, User, Palette, Sun, Sunrise, Sunset } from "lucide-react";
 
 export default function Settings() {
-  const { user, loading, signOut } = useAuth();
+  const { user, supabaseUser, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isDark, themeColor, setDarkMode, setTheme } = useTheme();
@@ -29,18 +29,18 @@ export default function Settings() {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (supabaseUser) {
       fetchProfile();
     }
-  }, [user]);
+  }, [supabaseUser]);
 
   const fetchProfile = async () => {
-    if (!user) return;
+    if (!supabaseUser) return;
     const { data } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
-      .single();
+      .eq("id", supabaseUser.id)
+      .maybeSingle();
     
     if (data) {
       setNotifications(data.notification_enabled ?? true);
@@ -50,11 +50,11 @@ export default function Settings() {
   };
 
   const updateProfile = async (field: string, value: any) => {
-    if (!user) return;
+    if (!supabaseUser) return;
     await supabase
       .from("profiles")
       .update({ [field]: value, updated_at: new Date().toISOString() })
-      .eq("id", user.id);
+      .eq("id", supabaseUser.id);
   };
 
   const handleSignOut = async () => {
